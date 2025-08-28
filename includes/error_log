@@ -1,0 +1,6 @@
+[12-Dec-2024 20:59:48 Etc/UTC] PHP Warning:  session_cache_limiter(): Session cache limiter cannot be changed when a session is active in /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php on line 243
+[12-Dec-2024 20:59:48 Etc/UTC] PHP Warning:  session_name(): Session name cannot be changed when a session is active in /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php on line 244
+[12-Dec-2024 20:59:48 Etc/UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php:44) in /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php on line 3435
+[12-Dec-2024 20:59:48 Etc/UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php:44) in /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php on line 3436
+[12-Dec-2024 20:59:48 Etc/UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php:44) in /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php on line 3437
+[12-Dec-2024 20:59:48 Etc/UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php:44) in /home4/techn1j1/mnm.techn.co.in/includes/wAPmtz.php on line 3438

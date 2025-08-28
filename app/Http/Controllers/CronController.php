@@ -10,247 +10,248 @@ use Illuminate\Support\Facades\Log;
 
 class CronController extends Controller
 {
-    // public function calculatedailyincome()
-    // {
-    //     $today = Carbon::today();
-    //     $dayOfWeek = $today->format('l');
-    //     if (in_array($dayOfWeek, ['Saturday', 'Sunday'])) {
-    //         return "Skipped: Today is {$dayOfWeek}, daily income not processed.";
-    //     }
-
-    //     $currentTimestamp = Carbon::now()->timestamp;
-    //     $todayTimestamp = Carbon::today()->addMinutes(30)->timestamp;
-
-    //     $eligibleMembers = DB::table('member_daily_income')
-    //         ->where('start_date', '<=', $currentTimestamp)
-    //         ->where('is_laps', 0)
-    //         ->where(function ($q) use ($currentTimestamp) {
-    //             $q->where('end_date', '>=', $currentTimestamp)
-    //                 ->orWhereNull('end_date');
-    //         })
-    //         ->whereColumn('total_received', '<', 'amount')
-    //         ->get();
-
-    //     $processedCount = 0;
-
-    //     foreach ($eligibleMembers as $entry) {
-    //         $capresponce = WalletHelper::checkSingleMemberCapping($entry->member_id);
-
-    //         $member = DB::table('member')->where('show_mem_id', $entry->member_id)->first();
-    //         if (!$member || $member->is_laps == 1) {
-    //             continue; // Skip lapsed members
-    //         }
-
-    //         // Use cumulative cap model: remainingCap = tot_cpping_amt - total_income
-    //         $earnings = WalletHelper::getMemberEarnings($member->show_mem_id);
-    //         $totalEarned = $earnings['total_income'];
-    //         $totalCap = (int) DB::table('member')
-    //             ->where('show_mem_id', $member->show_mem_id)
-    //             ->value('tot_cpping_amt');
-    //         $remainingCap = max($totalCap - $totalEarned, 0);
-
-    //         if ($remainingCap <= 0) {
-    //             continue;
-    //         }
-
-
-    //         $dailyIncome = round($entry->amount * 0.005, 2); // 0.5%
-    //         $remainingDaily = $entry->amount - $entry->total_received;
-
-    //         if ($dailyIncome > $remainingDaily) {
-    //             $dailyIncome = $remainingDaily;
-    //         }
-
-    //         if ($dailyIncome > $remainingCap) {
-    //             $dailyIncome = $remainingCap;
-    //         }
-
-    //         if ($dailyIncome <= 0) {
-    //             continue;
-    //         }
-    //         Log::info("Processing entry {$entry->id}: amount={$entry->amount}, total_received={$entry->total_received}, dailyIncome={$dailyIncome}, remainingDaily={$remainingDaily}, remainingCap={$remainingCap}");
-
-    //         $existingEntry = DB::table('member_income_history')
-    //             ->where('member_id', $entry->member_id)
-    //             ->where('member_daily_income_id', $entry->id)
-    //             ->where('date', $todayTimestamp)
-    //             ->first();
-
-    //         if ($existingEntry) {
-    //             continue;
-    //         }
-    //         Log::info("Row {$entry->id}: dailyIncome={$dailyIncome}, remainingCap={$remainingCap}, alreadyCreditedToday=" . ($existingEntry ? 1 : 0));
-
-    //         try {
-    //             // Insert today's income
-    //             DB::table('member_income_history')->insert([
-    //                 'member_id'   => $entry->member_id,
-    //                 'amount'      => $dailyIncome,
-    //                 'date'        => $todayTimestamp,
-    //                 'member_daily_income_id' => $entry->id,
-    //                 'created_at'  => $currentTimestamp,
-    //                 'updated_at'  => $currentTimestamp,
-    //             ]);
-
-    //             \App\Helpers\PaymentLogHelper::log(
-    //                 type: 'earning',
-    //                 member_id: $entry->member_id,
-    //                 sub_type: 'daily_income',
-    //                 amount: $dailyIncome,
-    //                 direction: 'debit',
-    //                 source: 'system',
-    //                 description: "Daily ROI â‚¹{$dailyIncome} credited to {$entry->member_id}",
-    //                 remarks: "Auto-credited as part of daily ROI cycle"
-    //             );
-
-    //             DB::table('member_daily_income')
-    //                 ->where('id', $entry->id)
-    //                 ->update([
-    //                     'total_received' => $entry->total_received + $dailyIncome,
-    //                     'updated_at'     => $currentTimestamp,
-    //                 ]);
-
-    //             $processedCount++;
-    //         } catch (\Exception $e) {
-    //             // Optional: log error
-    //         }
-    //     }
-
-    //     echo "Daily income processing completed.";
-    // }
     public function calculatedailyincome()
-{
-    $today = Carbon::today();
-    $dayOfWeek = $today->format('l');
-    if (in_array($dayOfWeek, ['Saturday', 'Sunday'])) {
-        return "Skipped: Today is {$dayOfWeek}, daily income not processed.";
-    }
-
-    $currentTimestamp = Carbon::now()->timestamp;
-    $todayTimestamp = Carbon::today()->addMinutes(30)->timestamp;
-
-    // Get all eligible entries and group by member
-    $eligibleEntries = DB::table('member_daily_income')
-        ->where('start_date', '<=', $currentTimestamp)
-        ->where('is_laps', 0)
-        ->where(function ($q) use ($currentTimestamp) {
-            $q->where('end_date', '>=', $currentTimestamp)
-                ->orWhereNull('end_date');
-        })
-        ->whereColumn('total_received', '<', 'amount')
-        ->get()
-        ->groupBy('member_id'); // ✅ Groups ALL topups per member
-
-    $processedCount = 0;
-
-    foreach ($eligibleEntries as $memberId => $memberEntries) {
-        // ✅ Check if member got ANY income today (prevents duplicates)
-        $alreadyPaidToday = DB::table('member_income_history')
-            ->where('member_id', $memberId)
-            ->whereDate('date', Carbon::today())
-            ->exists();
-
-        if ($alreadyPaidToday) {
-            continue; // Skip entire member
+    {
+        $today = Carbon::today();
+        
+        $dayOfWeek = $today->format('l');
+        if (in_array($dayOfWeek, ['Saturday', 'Sunday'])) {
+            return "Skipped: Today is {$dayOfWeek}, daily income not processed.";
         }
 
-        $member = DB::table('member')->where('show_mem_id', $memberId)->first();
-        if (!$member || $member->is_laps == 1) {
-            continue;
-        }
+        $currentTimestamp = Carbon::now()->timestamp;
+        $todayTimestamp = Carbon::today()->addMinutes(30)->timestamp;
+// echo date('Y-m-d H:i:s', $todayTimestamp) ;die;
+        $eligibleMembers = DB::table('member_daily_income')
+            ->where('start_date', '<=', $currentTimestamp)
+            ->where('is_laps', 0)
+            ->where(function ($q) use ($currentTimestamp) {
+                $q->where('end_date', '>=', $currentTimestamp)
+                    ->orWhereNull('end_date');
+            })
+            ->whereColumn('total_received', '<', 'amount')
+            ->get();
 
-        // Check member capping
-        $earnings = WalletHelper::getMemberEarnings($member->show_mem_id);
-        $totalEarned = $earnings['total_income'];
-        $totalCap = (int) DB::table('member')
-            ->where('show_mem_id', $member->show_mem_id)
-            ->value('tot_cpping_amt');
-        $remainingCap = max($totalCap - $totalEarned, 0);
+        $processedCount = 0;
 
-        if ($remainingCap <= 0) {
-            continue;
-        }
+        foreach ($eligibleMembers as $entry) {
+            $capresponce = WalletHelper::checkSingleMemberCapping($entry->member_id);
 
-        // ✅ Calculate income from ALL topups (regardless of amounts)
-        $totalDailyIncome = 0;
-        $entriesToUpdate = [];
+            $member = DB::table('member')->where('show_mem_id', $entry->member_id)->first();
+            if (!$member || $member->is_laps == 1) {
+                continue; // Skip lapsed members
+            }
 
-        foreach ($memberEntries as $entry) {
-            // Each topup contributes its 0.5% daily ROI
-            $dailyIncome = round($entry->amount * 0.005, 2); // Works for ANY amount
+            // Use cumulative cap model: remainingCap = tot_cpping_amt - total_income
+            $earnings = WalletHelper::getMemberEarnings($member->show_mem_id);
+            $totalEarned = $earnings['total_income'];
+            $totalCap = (int) DB::table('member')
+                ->where('show_mem_id', $member->show_mem_id)
+                ->value('tot_cpping_amt');
+            $remainingCap = max($totalCap - $totalEarned, 0);
+
+            if ($remainingCap <= 0) {
+                continue;
+            }
+
+
+            $dailyIncome = round($entry->amount * 0.005, 2); // 0.5%
             $remainingDaily = $entry->amount - $entry->total_received;
 
             if ($dailyIncome > $remainingDaily) {
                 $dailyIncome = $remainingDaily;
             }
 
-            if ($dailyIncome > 0) {
-                $totalDailyIncome += $dailyIncome; // ✅ Sums all different amounts
-                $entriesToUpdate[] = [
-                    'id' => $entry->id,
-                    'current_received' => $entry->total_received,
-                    'daily_amount' => $dailyIncome,
-                    'topup_amount' => $entry->amount // Track original amount
-                ];
+            if ($dailyIncome > $remainingCap) {
+                $dailyIncome = $remainingCap;
             }
-        }
 
-        if ($totalDailyIncome <= 0) {
-            continue;
-        }
+            if ($dailyIncome <= 0) {
+                continue;
+            }
+            Log::info("Processing entry {$entry->id}: amount={$entry->amount}, total_received={$entry->total_received}, dailyIncome={$dailyIncome}, remainingDaily={$remainingDaily}, remainingCap={$remainingCap}");
 
-        // Apply capping to total
-        if ($totalDailyIncome > $remainingCap) {
-            $totalDailyIncome = $remainingCap;
-        }
+            $existingEntry = DB::table('member_income_history')
+                ->where('member_id', $entry->member_id)
+                ->where('member_daily_income_id', $entry->id)
+                ->where('date', $todayTimestamp)
+                ->first();
 
-        try {
-            // ✅ Insert SINGLE aggregated entry (sum of all topups)
-            DB::table('member_income_history')->insert([
-                'member_id' => $memberId,
-                'amount' => $totalDailyIncome, // Combined from ALL topups
-                'date' => $todayTimestamp,
-                'member_daily_income_id' => $memberEntries->first()->id,
-                'created_at' => $currentTimestamp,
-                'updated_at' => $currentTimestamp,
-            ]);
+            if ($existingEntry) {
+                continue;
+            }
+            Log::info("Row {$entry->id}: dailyIncome={$dailyIncome}, remainingCap={$remainingCap}, alreadyCreditedToday=" . ($existingEntry ? 1 : 0));
 
-            \App\Helpers\PaymentLogHelper::log(
-                type: 'earning',
-                member_id: $memberId,
-                sub_type: 'daily_income',
-                amount: $totalDailyIncome,
-                direction: 'debit',
-                source: 'system',
-                description: "Daily ROI ₹{$totalDailyIncome} credited to {$memberId}",
-                remarks: "From " . count($memberEntries) . " topups: " . 
-                         implode(', ', array_column($entriesToUpdate, 'topup_amount'))
-            );
+            try {
+                // Insert today's income
+                DB::table('member_income_history')->insert([
+                    'member_id'   => $entry->member_id,
+                    'amount'      => $dailyIncome,
+                    'date'        => $todayTimestamp,
+                    'member_daily_income_id' => $entry->id,
+                    'created_at'  => $currentTimestamp,
+                    'updated_at'  => $currentTimestamp,
+                ]);
 
-            // ✅ Update each topup proportionally based on its contribution
-            $originalTotal = array_sum(array_column($entriesToUpdate, 'daily_amount'));
-            $actualProportion = $totalDailyIncome / $originalTotal;
+                \App\Helpers\PaymentLogHelper::log(
+                    type: 'earning',
+                    member_id: $entry->member_id,
+                    sub_type: 'daily_income',
+                    amount: $dailyIncome,
+                    direction: 'debit',
+                    source: 'system',
+                    description: "Daily ROI â‚¹{$dailyIncome} credited to {$entry->member_id}",
+                    remarks: "Auto-credited as part of daily ROI cycle"
+                );
 
-            foreach ($entriesToUpdate as $updateInfo) {
-                $actualDaily = $updateInfo['daily_amount'] * $actualProportion;
-                
                 DB::table('member_daily_income')
-                    ->where('id', $updateInfo['id'])
+                    ->where('id', $entry->id)
                     ->update([
-                        'total_received' => $updateInfo['current_received'] + $actualDaily,
-                        'updated_at' => $currentTimestamp,
+                        'total_received' => $entry->total_received + $dailyIncome,
+                        'updated_at'     => $currentTimestamp,
                     ]);
+
+                $processedCount++;
+            } catch (\Exception $e) {
+                // Optional: log error
             }
-
-            $processedCount++;
-
-        } catch (\Exception $e) {
-            Log::error("Daily income processing failed for member {$memberId}: " . $e->getMessage());
         }
-    }
 
-    echo "Daily income processing completed. Processed {$processedCount} members.";
-}
+        echo "Daily income processing completed.";
+    }
+//     public function calculatedailyincome()
+// {
+//     $today = Carbon::today();
+//     $dayOfWeek = $today->format('l');
+//     if (in_array($dayOfWeek, ['Saturday', 'Sunday'])) {
+//         return "Skipped: Today is {$dayOfWeek}, daily income not processed.";
+//     }
+
+//     $currentTimestamp = Carbon::now()->timestamp;
+//     $todayTimestamp = Carbon::today()->addMinutes(30)->timestamp;
+
+//     // Get all eligible entries and group by member
+//     $eligibleEntries = DB::table('member_daily_income')
+//         ->where('start_date', '<=', $currentTimestamp)
+//         ->where('is_laps', 0)
+//         ->where(function ($q) use ($currentTimestamp) {
+//             $q->where('end_date', '>=', $currentTimestamp)
+//                 ->orWhereNull('end_date');
+//         })
+//         ->whereColumn('total_received', '<', 'amount')
+//         ->get()
+//         ->groupBy('member_id'); // ✅ Groups ALL topups per member
+
+//     $processedCount = 0;
+
+//     foreach ($eligibleEntries as $memberId => $memberEntries) {
+//         // ✅ Check if member got ANY income today (prevents duplicates)
+//         $alreadyPaidToday = DB::table('member_income_history')
+//             ->where('member_id', $memberId)
+//             ->whereDate('date', Carbon::today())
+//             ->exists();
+
+//         if ($alreadyPaidToday) {
+//             continue; // Skip entire member
+//         }
+
+//         $member = DB::table('member')->where('show_mem_id', $memberId)->first();
+//         if (!$member || $member->is_laps == 1) {
+//             continue;
+//         }
+
+//         // Check member capping
+//         $earnings = WalletHelper::getMemberEarnings($member->show_mem_id);
+//         $totalEarned = $earnings['total_income'];
+//         $totalCap = (int) DB::table('member')
+//             ->where('show_mem_id', $member->show_mem_id)
+//             ->value('tot_cpping_amt');
+//         $remainingCap = max($totalCap - $totalEarned, 0);
+
+//         if ($remainingCap <= 0) {
+//             continue;
+//         }
+
+//         // ✅ Calculate income from ALL topups (regardless of amounts)
+//         $totalDailyIncome = 0;
+//         $entriesToUpdate = [];
+
+//         foreach ($memberEntries as $entry) {
+//             // Each topup contributes its 0.5% daily ROI
+//             $dailyIncome = round($entry->amount * 0.005, 2); // Works for ANY amount
+//             $remainingDaily = $entry->amount - $entry->total_received;
+
+//             if ($dailyIncome > $remainingDaily) {
+//                 $dailyIncome = $remainingDaily;
+//             }
+
+//             if ($dailyIncome > 0) {
+//                 $totalDailyIncome += $dailyIncome; // ✅ Sums all different amounts
+//                 $entriesToUpdate[] = [
+//                     'id' => $entry->id,
+//                     'current_received' => $entry->total_received,
+//                     'daily_amount' => $dailyIncome,
+//                     'topup_amount' => $entry->amount // Track original amount
+//                 ];
+//             }
+//         }
+
+//         if ($totalDailyIncome <= 0) {
+//             continue;
+//         }
+
+//         // Apply capping to total
+//         if ($totalDailyIncome > $remainingCap) {
+//             $totalDailyIncome = $remainingCap;
+//         }
+
+//         try {
+//             // ✅ Insert SINGLE aggregated entry (sum of all topups)
+//             DB::table('member_income_history')->insert([
+//                 'member_id' => $memberId,
+//                 'amount' => $totalDailyIncome, // Combined from ALL topups
+//                 'date' => $todayTimestamp,
+//                 'member_daily_income_id' => $memberEntries->first()->id,
+//                 'created_at' => $currentTimestamp,
+//                 'updated_at' => $currentTimestamp,
+//             ]);
+
+//             \App\Helpers\PaymentLogHelper::log(
+//                 type: 'earning',
+//                 member_id: $memberId,
+//                 sub_type: 'daily_income',
+//                 amount: $totalDailyIncome,
+//                 direction: 'debit',
+//                 source: 'system',
+//                 description: "Daily ROI ₹{$totalDailyIncome} credited to {$memberId}",
+//                 remarks: "From " . count($memberEntries) . " topups: " . 
+//                          implode(', ', array_column($entriesToUpdate, 'topup_amount'))
+//             );
+
+//             // ✅ Update each topup proportionally based on its contribution
+//             $originalTotal = array_sum(array_column($entriesToUpdate, 'daily_amount'));
+//             $actualProportion = $totalDailyIncome / $originalTotal;
+
+//             foreach ($entriesToUpdate as $updateInfo) {
+//                 $actualDaily = $updateInfo['daily_amount'] * $actualProportion;
+                
+//                 DB::table('member_daily_income')
+//                     ->where('id', $updateInfo['id'])
+//                     ->update([
+//                         'total_received' => $updateInfo['current_received'] + $actualDaily,
+//                         'updated_at' => $currentTimestamp,
+//                     ]);
+//             }
+
+//             $processedCount++;
+
+//         } catch (\Exception $e) {
+//             Log::error("Daily income processing failed for member {$memberId}: " . $e->getMessage());
+//         }
+//     }
+
+//     echo "Daily income processing completed. Processed {$processedCount} members.";
+// }
 
 
 

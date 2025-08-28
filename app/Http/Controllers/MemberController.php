@@ -1170,32 +1170,84 @@ class MemberController extends Controller
     /**
      * Display member daily income with pagination
      */
-    public function memberDailyIncome(Request $request)
-    {
-        // Logged-in member ID
-        $memid = auth()->user()->show_mem_id;
+    // public function memberDailyIncome(Request $request)
+    // {
+    //     // Logged-in member ID
+    //     $memid = auth()->user()->show_mem_id;
 
-        // Get member record
-        $member = DB::table('member')->where('show_mem_id', $memid)->first();
+    //     // Get member record
+    //     $member = DB::table('member')->where('show_mem_id', $memid)->first();
 
-        if (!$member) {
-            return abort(404, 'Member not found');
-        }
+    //     if (!$member) {
+    //         return abort(404, 'Member not found');
+    //     }
 
-        // Summary table: member_daily_income
-        $dailyIncome = DB::table('member_daily_income')
-            ->where('member_id', $memid)
-            ->orderBy('created_at', 'desc')
-            ->paginate(10);
+    //     // Summary table: member_daily_income
+    //     $dailyIncome = DB::table('member_daily_income')
+    //         ->where('member_id', $memid)
+    //         ->orderBy('created_at', 'desc')
+    //         ->paginate(10);
 
-        // Breakdown table: member_income_history
-        $incomeHistory = DB::table('member_income_history')
-            ->where('member_id', $memid)
-            ->orderBy('date', 'desc')
-            ->paginate(10);
+    //     // Breakdown table: member_income_history
+    //     $incomeHistory = DB::table('member_income_history')
+    //         ->where('member_id', $memid)
+    //         ->orderBy('date', 'desc')
+    //         ->paginate(10);
 
-        return view('member.daily_income', compact('member', 'dailyIncome', 'incomeHistory', 'memid'));
+    //     return view('member.daily_income', compact('member', 'dailyIncome', 'incomeHistory', 'memid'));
+    // }
+public function memberDailyIncome(Request $request)
+{
+    // Logged-in member ID
+    $memid = auth()->user()->show_mem_id;
+
+    // Get member record
+    $member = DB::table('member')->where('show_mem_id', $memid)->first();
+
+    if (!$member) {
+        return abort(404, 'Member not found');
     }
+
+    // Summary table: member_daily_income
+    $dailyIncome = DB::table('member_daily_income')
+        ->where('member_id', $memid)
+        ->orderBy('created_at', 'desc')
+        ->paginate(10);
+
+    // ✅ Get ALL income history (not paginated) for proper breakdown display
+    $allIncomeHistory = DB::table('member_income_history')
+        ->where('member_id', $memid)
+        ->orderBy('date', 'desc')
+        ->get();
+
+    // ✅ Paginated income history for main display
+    $incomeHistory = DB::table('member_income_history')
+        ->where('member_id', $memid)
+        ->orderBy('date', 'desc')
+        ->paginate(10);
+
+    // ✅ Calculate accurate totals
+    $totalIncomeEarned = DB::table('member_income_history')
+        ->where('member_id', $memid)
+        ->sum('amount');
+
+    $totalInvestment = DB::table('member_daily_income')
+        ->where('member_id', $memid)
+        ->sum('amount');
+
+    return view('member.daily_income', compact(
+        'member', 
+        'dailyIncome', 
+        'incomeHistory', 
+        'allIncomeHistory',  // ✅ Add this for proper breakdown
+        'memid',
+        'totalIncomeEarned',
+        'totalInvestment'
+    ));
+}
+
+
+
 
     /**
      * Display member direct payment with pagination

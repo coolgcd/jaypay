@@ -89,7 +89,6 @@
 </style>
 
 <div class="container py-5">
-    <!-- 🔹 Summary Card with Breakdown -->
     <div class="glass-card animate__animated animate__fadeIn">
         <div class="card-header-custom">
             <i class="bi bi-calendar-check"></i> Daily Income Summary - {{ $member->name }} ({{ $memid }})
@@ -117,8 +116,11 @@
                                 @php
                                     $start = \Carbon\Carbon::createFromTimestamp($income->start_date)->timezone(config('app.timezone'));
                                     $end = \Carbon\Carbon::createFromTimestamp($income->end_date)->timezone(config('app.timezone'));
-                                    $breakdowns = $incomeHistory->where('member_id', $income->member_id)
-                                        ->whereBetween('date', [$income->start_date, $income->end_date]);
+                                    
+                                    // ✅ FIXED: Use proper filtering logic for breakdowns
+                                    $breakdowns = $allIncomeHistory->filter(function($item) use ($income) {
+                                        return $item->member_daily_income_id == $income->id;
+                                    });
                                 @endphp
                                 <tr>
                                     <td>{{ $index + $dailyIncome->firstItem() }}</td>
@@ -170,6 +172,20 @@
                     </table>
                 </div>
 
+                <!-- ✅ ADD: Display accurate totals -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="alert alert-info">
+                            <strong>Total Investment:</strong> ₹{{ number_format($totalInvestment, 2) }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-success">
+                            <strong>Total Earned:</strong> ₹{{ number_format($totalIncomeEarned, 2) }}
+                        </div>
+                    </div>
+                </div>
+
                 <div class="d-flex justify-content-center mt-4">
                     {{ $dailyIncome->links() }}
                 </div>
@@ -181,4 +197,5 @@
         </div>
     </div>
 </div>
+
 @endsection
